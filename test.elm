@@ -1,5 +1,16 @@
 import Slideshow as S
 
+downing : S.Slide
+downing = S.toSlide [ [markdown|
+#First
+
+test
+|], [markdown|
+#Second
+
+better test
+|] ] 
+
 ss = [[markdown|
 #elm
   
@@ -9,13 +20,8 @@ Author name
 
     -elm
     -slideshow
-|],[markdown|
-#Some more list
-
-    -1
-    -2
-    -3
-
 |]]
 
-main = S.show <| S.toSlideshow ss
+
+
+main = S.show <| S.append (S.toSlideshow ss) [downing]
