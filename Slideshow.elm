@@ -1,5 +1,7 @@
 module Slideshow where
 
+import open Clickable 
+
 import Keyboard
 import Window
 import open Graphics.Input
@@ -67,33 +69,34 @@ isRight (Slideshow _ _ u) = if
     | u == [] -> False
     | otherwise -> True
 
-arrow customButton slide = 
+arrow = 
     let triangle = filled blue <| ngon 3 30
         size = 60
         rot = map degrees [0,90,180,270]
         pos = [midRight, midTop, midLeft, midBottom]
         event = [Right, Up, Left, Down]
-        createButton a e = customButton a e e e
         filler = spacer size size
         place [r,u,l,d] = flow down
             [flow right [filler,u,filler],
              flow right [l,filler,r],
              flow right [filler,d, filler]]
+        finalize (elem,events) = (merges events, place elem)
     in map (flip rotate triangle) rot 
         |> map (flip (::) [])
         |> map (collage size size)
         |> zip event
-        |> map (uncurry createButton)
-        |> place
+        |> map (uncurry <| flip onclick)
+        |> unzip
+        |> finalize
 
 resize (x,y) e = 
     let s = min ((toFloat x) / (toFloat <| widthOf e)) ((toFloat (y-200)) / (toFloat <| heightOf e))
     in collage x y [scale s (toForm e)] 
 
 show s = 
-    let {events, customButton}  = customButtons None
+    let (events, arrows) = arrow 
         slideState = foldp update s <| merge input events
         current = currentSlide <~ slideState
         slide = lift2 resize Window.dimensions current
-        arr = lift2 (\(x,y) e -> container x y bottomRight e) Window.dimensions <| arrow customButton <~ slideState
-    in lift (flow outward) <| combine [slide,arr,lift asText <| merge input events] 
+        arr = lift (\(x,y) -> container x y bottomRight arrows) Window.dimensions 
+    in lift (flow outward) <| combine [slide,arr]
