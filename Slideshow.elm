@@ -29,23 +29,6 @@ input =
           | otherwise -> None
     in lift arrowToMove Keyboard.arrows
 
-
---Update
-update move sl = 
-    let (Slideshow l s r) = sl
-        (Slide u e d) = s
-    in if is move sl
-    then case move of
-        Up -> Slideshow l (Slide (tail u) (head u) (e::d)) r
-        Down -> Slideshow l (Slide (e::u) (head d) (tail d)) r
-        Left -> Slideshow (tail l) (head l) (s::r)
-        Right -> Slideshow (s::l) (head r) (tail r)
-        None -> sl
-    else sl
-
---Render
-currentSlide (Slideshow _ (Slide _ e _) _) = e
-
 is move slide = case move of 
     None -> True
     Up -> isUp slide
@@ -69,34 +52,61 @@ isRight (Slideshow _ _ u) = if
     | u == [] -> False
     | otherwise -> True
 
-arrow = 
-    let triangle = filled blue <| ngon 3 30
+--Update
+update move sl = 
+    let (Slideshow l s r) = sl
+        (Slide u e d) = s
+    in if is move sl
+    then case move of
+        Up -> Slideshow l (Slide (tail u) (head u) (e::d)) r
+        Down -> Slideshow l (Slide (e::u) (head d) (tail d)) r
+        Left -> Slideshow (tail l) (head l) (s::r)
+        Right -> Slideshow (s::l) (head r) (tail r)
+        None -> sl
+    else sl
+
+--Render
+currentSlide (Slideshow _ (Slide _ e _) _) = e
+
+
+makearrow slideshow =
+    let triangle = flip filled (ngon 3 30)
+        color = blue
+        colorInactive = grey
         size = 60
         rot = map degrees [0,90,180,270]
-        pos = [midRight, midTop, midLeft, midBottom]
         event = [Right, Up, Left, Down]
+        colorize event elem = elem (if is event slideshow then color else colorInactive)
+    in map (always triangle) event
+        |> zip event
+        |> map (uncurry colorize)
+        |> zip rot
+        |> map (uncurry rotate)
+        |> map (flip (::) [])
+        |> map (collage size size)
+
+addEventArrow arr eventBinder = 
+    let pos = [midRight, midTop, midLeft, midBottom]
+        event = [Right, Up, Left, Down]
+        size = 60
         filler = spacer size size
         place [r,u,l,d] = flow down
             [flow right [filler,u,filler],
              flow right [l,filler,r],
              flow right [filler,d, filler]]
-        finalize (elem,events) = (merges events, place elem)
-    in map (flip rotate triangle) rot 
-        |> map (flip (::) [])
-        |> map (collage size size)
-        |> zip event
-        |> map (uncurry <| flip onclick)
-        |> unzip
-        |> finalize
+    in zip event arr
+        |> map (uncurry eventBinder)
+        |> place
 
 resize (x,y) e = 
     let s = min ((toFloat x) / (toFloat <| widthOf e)) ((toFloat (y-200)) / (toFloat <| heightOf e))
     in collage x y [scale s (toForm e)] 
 
 show s = 
-    let (events, arrows) = arrow 
+    let {events, clickable} = clickables None
         slideState = foldp update s <| merge input events
         current = currentSlide <~ slideState
         slide = lift2 resize Window.dimensions current
-        arr = lift (\(x,y) -> container x y bottomRight arrows) Window.dimensions 
+        arrow = lift (flip addEventArrow clickable) (makearrow <~ slideState)
+        arr = lift2 (\(x,y) e -> container x y bottomRight e) Window.dimensions arrow
     in lift (flow outward) <| combine [slide,arr]
